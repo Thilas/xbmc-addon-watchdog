@@ -235,7 +235,10 @@ if platform.is_windows():
       ptr = ctypes.addressof(fni) + FILE_NOTIFY_INFORMATION.FileName.offset
       #filename = ctypes.wstring_at(ptr, fni.FileNameLength)
       filename = ctypes.string_at(ptr, fni.FileNameLength)
-      results.append((fni.Action, filename.decode('utf-16')))
+      if platform.is_windows():
+        results.append((fni.Action, filename.decode('utf-16').encode('cp1252')))
+      else:
+        results.append((fni.Action, filename.decode('utf-16')))
       numToSkip = fni.NextEntryOffset
       if numToSkip <= 0:
         break
@@ -251,7 +254,10 @@ if platform.is_windows():
       jump, action, namelen = struct.unpack("iii", event_buffer[pos:pos + 12])
       # TODO: this may return a shortname or a longname, with no way
       # to tell which.  Normalise them somehow?
-      name = event_buffer[pos + 12:pos + 12 + namelen].decode("utf-16")
+      if platform.is_windows():
+        name = event_buffer[pos + 12:pos + 12 + namelen].decode("utf-16").encode('cp1252')
+      else:
+        name = event_buffer[pos + 12:pos + 12 + namelen].decode("utf-16")
       yield (name, action)
       if not jump:
         break
