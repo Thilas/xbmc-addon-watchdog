@@ -156,5 +156,8 @@ if platform.is_darwin():
       # string. https://github.com/gorakhargosh/watchdog/issues#issue/26
       if isinstance(path, unicode):
         #path = unicode(path, 'utf-8')
-        path = unicodedata.normalize('NFC', path).encode('utf-8')
+        if platform.is_windows():
+          path = unicodedata.normalize('NFC', path).encode('cp1252')
+        else:
+          path = unicodedata.normalize('NFC', path).encode('utf-8')
       return BaseObserver.schedule(self, event_handler, path, recursive)
