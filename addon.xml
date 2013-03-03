@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <addon
-    id="service.watchdog"
-    name="Watchdog"
-    version="0.7.2"
-    provider-name="takoi">
+    id="service.watchdog2"
+    name="Watchdog 2"
+    version="0.7.2.1"
+    provider-name="takoi, Thilas">
   <requires>
     <import addon="xbmc.python"              version="2.1.0"/>
     <import addon="script.module.simplejson" version="2.0.10"/>
@@ -12,7 +12,11 @@
   <extension point="xbmc.python.script" library="script.py"/>
   <extension point="xbmc.addon.metadata">
     <platform>all</platform>
-    <summary>Keep library synced with file system</summary>
-    <description>This service will automatically update the video and music library when new files are added or removed from a media source. Update is instant.</description>
+    <summary lang="en">Keep library synced with file system</summary>
+    <summary lang="fr">Maintient les médiathèques synchonisée avec le système de fichiers</summary>
+    <description lang="en">This service will automatically update the video and music library when new files are added or removed from a media source. Update is instant.</description>
+    <description lang="fr">Ce service met automatiquement à jour les médiathèques vidéo et musique lorsque des nouveaux fichiers sont ajoutés ou supprimés d'une source. La mise à jour est instantannée.</description>
+    <license>GNU GENERAL PUBLIC LICENSE. Version 3, 29 June 2007</license>
+    <source>https://github.com/Thilas/xbmc-addon-watchdog</source>
   </extension>
 </addon>
