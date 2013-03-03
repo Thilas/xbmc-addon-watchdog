@@ -16,5 +16,7 @@
   <string id="30014">Depth 2 (Look 2 directories deep)</string>
   <string id="30015">Depth inf. (Look in every subdirectory)</string>
   <string id="30016">Pause on playback</string>
+  <string id="30017">Refresh .nfo files</string>
+  <string id="30018">Update on startup</string>
+  <string id="30019">Clean on startup</string>
 </strings>
-
