@@ -26,6 +26,7 @@ from time import sleep
 from urllib import unquote
 from functools import partial
 from watchdog.events import FileSystemEventHandler
+from watchdog.utils import platform
 
 ADDON = xbmcaddon.Addon()
 ADDON_ID = ADDON.getAddonInfo('id')
@@ -38,6 +39,11 @@ WATCH_MUSIC = ADDON.getSetting('watchmusic') == 'true'
 DELAY = int("0"+ADDON.getSetting('delay')) or 1
 SHOW_NOTIFICATIONS = ADDON.getSetting('notifications') == 'true'
 PAUSE_ON_PLAYBACK = ADDON.getSetting('pauseonplayback') == 'true'
+EXPORT_VIDEO = ADDON.getSetting('exportvideo') == 'true'
+EXPORT_MUSIC = ADDON.getSetting('exportmusic') == 'true'
+UPDATE_VIDEO_ON_STARTUP = ADDON.getSetting('updatevideoonstartup') == 'true'
+UPDATE_MUSIC_ON_STARTUP = ADDON.getSetting('updatemusiconstartup') == 'true'
+CLEAN_ON_STARTUP = ADDON.getSetting('cleanonstartup') == 'true'
 EXTENSIONS = "|.nsv|.m4a|.flac|.aac|.strm|.pls|.rm|.rma|.mpa|.wav|.wma|.ogg|.mp3|.mp2|.m3u|.mod|.amf|.669|.dmf|.dsm|.far|.gdm|.imf|.it|.m15|.med|.okt|.s3m|.stm|.sfx|.ult|.uni|.xm|.sid|.ac3|.dts|.cue|.aif|.aiff|.wpl|.ape|.mac|.mpc|.mp+|.mpp|.shn|.zip|.rar|.wv|.nsf|.spc|.gym|.adx|.dsp|.adp|.ymf|.ast|.afc|.hps|.xsp|.xwav|.waa|.wvs|.wam|.gcm|.idsp|.mpdsp|.mss|.spt|.rsd|.mid|.kar|.sap|.cmc|.cmr|.dmc|.mpt|.mpd|.rmt|.tmc|.tm8|.tm2|.oga|.url|.pxml|.tta|.rss|.cm3|.cms|.dlt|.brstm|.wtv|.mka|.m4v|.3g2|.3gp|.nsv|.tp|.ts|.ty|.strm|.pls|.rm|.rmvb|.m3u|.ifo|.mov|.qt|.divx|.xvid|.bivx|.vob|.nrg|.img|.iso|.pva|.wmv|.asf|.asx|.ogm|.m2v|.avi|.bin|.dat|.mpg|.mpeg|.mp4|.mkv|.avc|.vp3|.svq3|.nuv|.viv|.dv|.fli|.flv|.rar|.001|.wpl|.zip|.vdr|.dvr-ms|.xsp|.mts|.m2t|.m2ts|.evo|.ogv|.sdp|.avs|.rec|.url|.pxml|.vc1|.h264|.rcv|.rss|.mpls|.webm|.bdmv|.wtv|.m4v|.3g2|.3gp|.nsv|.tp|.ts|.ty|.strm|.pls|.rm|.rmvb|.m3u|.m3u8|.ifo|.mov|.qt|.divx|.xvid|.bivx|.vob|.nrg|.img|.iso|.pva|.wmv|.asf|.asx|.ogm|.m2v|.avi|.bin|.dat|.mpg|.mpeg|.mp4|.mkv|.avc|.vp3|.svq3|.nuv|.viv|.dv|.fli|.flv|.rar|.001|.wpl|.zip|.vdr|.dvr-ms|.xsp|.mts|.m2t|.m2ts|.evo|.ogv|.sdp|.avs|.rec|.url|.pxml|.vc1|.h264|.rcv|.rss|.mpls|.webm|.bdmv|.wtv|"
 
 
@@ -49,15 +55,50 @@ class XBMCActor(pykka.ThreadingActor):
         or xbmc.getCondVisibility('Library.IsScanning')
         or xbmc.getCondVisibility('Window.IsActive(10101)'))
   
-  def scan(self, library, path):
-    """ Tell xbmc to scan. Returns immediately when scanning has started. """
+  def update(self, library):
+    """ Tell xbmc to update. Returns immediately when updating has started. """
     while self._xbmc_is_busy():
       pass
-    log("scanning %s (%s)" % (path, library))
-    xbmc.executebuiltin("UpdateLibrary(%s,\"%s\")" % (library, path))
+    log("updating %s library on startup" % library)
+    xbmc.executebuiltin("UpdateLibrary(%s)" % library)
+    if EXPORT_VIDEO and library == 'video' or EXPORT_MUSIC and library == 'music':
+      while self._xbmc_is_busy():
+        pass
+      log("exporting %s library on startup" % library)
+      if EXPORT_VIDEO and library == 'video':
+        xbmc.executebuiltin("ExportLibrary(video,true,false,true,false)")
+      else:
+        xbmc.executebuiltin("ExportLibrary(video,false)")
+    if CLEAN and CLEAN_ON_STARTUP:
+      while self._xbmc_is_busy():
+        pass
+      log("cleaning %s library on startup" % library)
+      xbmc.executebuiltin("CleanLibrary(%s)" % library)
+  
+  def scan(self, library, path):
+    """ Tell xbmc to scan and then export. Returns immediately when scanning or exporting has started. """
+    while self._xbmc_is_busy():
+      pass
+    if platform.is_windows():
+      #xbmc_path = path.decode('cp1252').encode('utf-8')
+      # update the whole library because, at least on windows, updating a path actually updates only this specific path and not its subfolders
+      log("scanning %s library" % library)
+      xbmc.executebuiltin("UpdateLibrary(%s)" % library)
+    else:
+      xbmc_path = path
+      log("scanning %s library (<%s>)" % (library, xbmc_path))
+      xbmc.executebuiltin("UpdateLibrary(%s,\"%s\")" % (library, escape(xbmc_path)))
+    if EXPORT_VIDEO and library == 'video' or EXPORT_MUSIC and library == 'music':
+      while self._xbmc_is_busy():
+        pass
+      log("exporting %s library" % library)
+      if EXPORT_VIDEO and library == 'video':
+        xbmc.executebuiltin("ExportLibrary(video,true,false,true,false)")
+      else:
+        xbmc.executebuiltin("ExportLibrary(video,false)")
   
   def clean(self, library, path=None):
-    """ Tell xbmc to clean. Returns immediately when scanning has started. """
+    """ Tell xbmc to clean. Returns immediately when cleaning has started. """
     while self._xbmc_is_busy():
       pass
     log("cleaning %s library" % library)
@@ -120,20 +161,44 @@ class EventHandler(FileSystemEventHandler):
     self.event_queue = event_queue
   
   def on_created(self, event):
+    if not event.is_directory:
+      _, ext = os.path.splitext(str(event.src_path))
+      log("file extension: %s" % ext)
+      if EXTENSIONS.find('|%s|' % ext) == -1:
+        return
+    log("schedule scan")
     self.event_queue.scan()
   
   def on_deleted(self, event):
     if CLEAN:
       if not event.is_directory:
         _, ext = os.path.splitext(str(event.src_path))
+        log("file extension: %s" % ext)
         if EXTENSIONS.find('|%s|' % ext) == -1:
           return
+      log("schedule clean")
       self.event_queue.clean()
   
   def on_moved(self, event):
     if CLEAN:
-      self.event_queue.clean()
+      if not event.is_directory:
+        _, ext = os.path.splitext(str(event.src_path))
+        log("file extension: %s" % ext)
+        schedule_clean = EXTENSIONS.find('|%s|' % ext) != -1
+      else:
+        schedule_clean = true
+      if schedule_clean:
+        log("schedule clean")
+        self.event_queue.clean()
+    if not event.is_directory:
+      _, ext = os.path.splitext(str(event.dest_path))
+      log("file extension: %s" % ext)
+      if EXTENSIONS.find('|%s|' % ext) == -1:
+        return
+    log("schedule scan")
     self.event_queue.scan()
+  
+  #def on_modified(self, event):
   
   def on_any_event(self, event):
     log("<%s> <%s>" % (str(event.event_type), str(event.src_path)))
@@ -162,16 +227,23 @@ def log(msg):
 
 def notify(msg):
   if SHOW_NOTIFICATIONS:
-    xbmc.executebuiltin("XBMC.Notification(Library Watchdog,\"%s\")" % msg)
+    xbmc.executebuiltin("XBMC.Notification(Library Watchdog,\"%s\")" % escape(msg))
+
+def escape(value):
+    return value.replace("\\","\\\\").replace("\"","\\\"")
 
 def select_observer(path):
   import observers
+  log("checking <%s>" % path)
   if os.path.exists(path):
+    log("os path exists")
     if POLLING:
       return observers.local_full
     return observers.auto
   elif re.match("^[A-Za-z]+://", path):
+    log("network path")
     if xbmcvfs.exists(path):
+      log("path exists")
       return [observers.xbmc_depth_1, observers.xbmc_depth_2, observers.xbmc_full][POLLING_METHOD]
   return None
 
@@ -180,7 +252,10 @@ def watch(library, xbmc_actor):
   sources = get_media_sources(library)
   log("%s sources %s" % (library, sources))
   for path in sources:
-    path = path.encode('utf-8')
+    if platform.is_windows():
+      path = path.encode('cp1252')
+    else:
+      path = path.encode('utf-8')
     observer_cls = select_observer(path)
     if observer_cls:
       try:
@@ -200,6 +275,8 @@ def watch(library, xbmc_actor):
     else:
       log("not watching <%s>" % path)
       notify("Not watching %s" % path)
+  if UPDATE_VIDEO_ON_STARTUP and library == 'video' or UPDATE_MUSIC_ON_STARTUP and library == 'music':
+    xbmc_actor.update(library)
   return threads
 
 def main():
