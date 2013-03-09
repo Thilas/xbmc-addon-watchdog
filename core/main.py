@@ -26,7 +26,6 @@ from time import sleep
 from urllib import unquote
 from functools import partial
 from watchdog.events import FileSystemEventHandler
-from watchdog.utils import platform
 
 ADDON = xbmcaddon.Addon()
 ADDON_ID = ADDON.getAddonInfo('id')
@@ -79,15 +78,11 @@ class XBMCActor(pykka.ThreadingActor):
     """ Tell xbmc to scan and then export. Returns immediately when scanning or exporting has started. """
     while self._xbmc_is_busy():
       pass
-    if platform.is_windows():
-      #xbmc_path = path.decode('cp1252').encode('utf-8')
-      # update the whole library because, at least on windows, updating a path actually updates only this specific path and not its subfolders
-      log("scanning %s library" % library)
-      xbmc.executebuiltin("UpdateLibrary(%s)" % library)
-    else:
-      xbmc_path = path
-      log("scanning %s library (<%s>)" % (library, xbmc_path))
-      xbmc.executebuiltin("UpdateLibrary(%s,\"%s\")" % (library, escape(xbmc_path)))
+    log("scanning %s library (<%s>)" % (library, path))
+    xbmc.executebuiltin("UpdateLibrary(%s,%s)" % (library, escape_param(path)))
+    # update the whole library because, at least on windows, updating a path actually updates only this specific path and not its subfolders
+    #log("scanning %s library" % library)
+    #xbmc.executebuiltin("UpdateLibrary(%s)" % library)
     if EXPORT_VIDEO and library == 'video' or EXPORT_MUSIC and library == 'music':
       while self._xbmc_is_busy():
         pass
@@ -161,47 +156,35 @@ class EventHandler(FileSystemEventHandler):
     self.event_queue = event_queue
   
   def on_created(self, event):
-    if not event.is_directory:
-      _, ext = os.path.splitext(str(event.src_path))
-      log("file extension: %s" % ext)
-      if EXTENSIONS.find('|%s|' % ext) == -1:
-        return
-    log("schedule scan")
-    self.event_queue.scan()
+    if not self._can_skip(event, event.src_path):
+      log("schedule scan")
+      self.event_queue.scan()
   
   def on_deleted(self, event):
-    if CLEAN:
-      if not event.is_directory:
-        _, ext = os.path.splitext(str(event.src_path))
-        log("file extension: %s" % ext)
-        if EXTENSIONS.find('|%s|' % ext) == -1:
-          return
+    if CLEAN and not self._can_skip(event, event.src_path):
       log("schedule clean")
       self.event_queue.clean()
   
   def on_moved(self, event):
-    if CLEAN:
-      if not event.is_directory:
-        _, ext = os.path.splitext(str(event.src_path))
-        log("file extension: %s" % ext)
-        schedule_clean = EXTENSIONS.find('|%s|' % ext) != -1
-      else:
-        schedule_clean = true
-      if schedule_clean:
-        log("schedule clean")
-        self.event_queue.clean()
-    if not event.is_directory:
-      _, ext = os.path.splitext(str(event.dest_path))
-      log("file extension: %s" % ext)
-      if EXTENSIONS.find('|%s|' % ext) == -1:
-        return
-    log("schedule scan")
-    self.event_queue.scan()
+    if CLEAN and not self._can_skip(event, event.src_path):
+      log("schedule clean")
+      self.event_queue.clean()
+    if not self._can_skip(event, event.dest_path):
+      log("schedule scan")
+      self.event_queue.scan()
   
   #def on_modified(self, event):
   
   def on_any_event(self, event):
-    log("<%s> <%s>" % (str(event.event_type), str(event.src_path)))
+    log("<%s> <%s>" % (event.event_type, event.src_path))
+  
+  def _can_skip(self, event, path):
+    if not event.is_directory and path:
+      _, ext = os.path.splitext(path)
+      if EXTENSIONS.find('|%s|' % ext) == -1:
+        log("skipping <%s> <%s>" % (event.event_type, path))
+        return True
+    return False
 
 
 def get_media_sources(type):
@@ -222,15 +205,16 @@ def get_media_sources(type):
           ret.append(path)
   return ret
 
+def escape_param(s):
+  escaped = s.replace('\\', '\\\\').replace('"', '\\"')
+  return '"' + escaped.encode('utf-8') + '"'
+
 def log(msg):
-  xbmc.log("%s: %s" % (ADDON_ID, msg), xbmc.LOGDEBUG)
+  xbmc.log("%s: %s" % (ADDON_ID, msg.encode('utf-8')), xbmc.LOGDEBUG)
 
 def notify(msg):
   if SHOW_NOTIFICATIONS:
-    xbmc.executebuiltin("XBMC.Notification(Library Watchdog,\"%s\")" % escape(msg))
-
-def escape(value):
-    return value.replace("\\","\\\\").replace("\"","\\\"")
+    xbmc.executebuiltin("XBMC.Notification(Library Watchdog,%s)" % escape_param(msg))
 
 def select_observer(path):
   import observers
@@ -252,10 +236,6 @@ def watch(library, xbmc_actor):
   sources = get_media_sources(library)
   log("%s sources %s" % (library, sources))
   for path in sources:
-    if platform.is_windows():
-      path = path.encode('cp1252')
-    else:
-      path = path.encode('utf-8')
     observer_cls = select_observer(path)
     if observer_cls:
       try:
