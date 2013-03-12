@@ -2,7 +2,7 @@
 <addon
     id="service.watchdog2"
     name="Watchdog 2"
-    version="0.7.2.1"
+    version="0.7.3"
     provider-name="takoi, Thilas">
   <requires>
     <import addon="xbmc.python"              version="2.1.0"/>

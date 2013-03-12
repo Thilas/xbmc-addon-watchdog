@@ -1,3 +1,9 @@
+[B]0.7.3[/B]
+- added French translation
+- now tries to not scan when when non-media files are added
+- fixed: scanning sometimes failing due to reserved characters not being escaped
+- fixed: poller (depth 2) sometimes failing when files are added
+
 [B]0.7.2.1[/B]
 - fixed: addon not able to handle paths with accents on windows
 - fixed: quote executebuiltin parameters
@@ -5,7 +11,7 @@
 - added options for updating library on startup
 - added option for cleaning library on startup
 - added options for exporting .nfo files
-- added french translations
+- added French translations
 
 [B]0.7.2[/B]
 - added option for disabling pause on playback
